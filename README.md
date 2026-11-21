@@ -1,0 +1,43 @@
+# rhino-debugger-demo
+
+A small browser IDE that debugs JavaScript line by line on **batik-js-lens 1.7** (Rhino 1.6R5),
+built on Rhino's own `Debugger` / `DebugFrame` API. Spring Boot 4.0.8 (Spring Framework 7.0.9), Java 21.
+
+Features: breakpoints (click the gutter), Continue (F8), Step over (F10), Step into (F11),
+Step out (Shift+F11), Stop (Shift+F5), call stack with frame selection, variables per frame,
+watch expressions evaluated in the selected frame, and `print` / `console.log` output.
+Scripts get Java objects in scope (`order`, `pricing`) to show Java interop.
+
+## Run
+
+The demo depends on `io.github.rhino-lens:batik-js-lens:1.7`, a byte-identical rebuild of
+`org.apache.xmlgraphics:batik-js:1.7`. Until it is on Maven Central, install a local build of it first:
+
+```sh
+mvn install:install-file -Dfile=batik-js-lens-1.7.jar -DpomFile=pom.xml   # from a batik-js-lens build
+```
+
+Then:
+
+```sh
+mvn package
+java -jar target/rhino-debugger-demo-0.1.0-SNAPSHOT.jar
+```
+
+Open http://127.0.0.1:8099 (add `?autorun` to start a session straight away).
+The server runs scripts posted to it, so it listens on 127.0.0.1 only.
+
+## How it works
+
+| Piece | Role |
+|---|---|
+| `debug/ScriptRunner` | Enters a Context in interpreted mode (`setOptimizationLevel(-1)`, debug info on, as Rhino requires for a Debugger), puts the Java objects in scope, evaluates |
+| `debug/DebugSession` | Implements `Debugger`; one `DebugFrame` per call keeps the call stack. `onLineChange` decides whether to pause (breakpoint, step into/over/out) and then blocks the script thread until a command arrives. Watches are evaluated on that paused thread, in the frame's activation scope. Stop throws a `java.lang.Error`, which script `try/catch` cannot catch |
+| `web/DebugController` | REST commands plus Server-Sent Events that push the whole session state on every change |
+| `static/index.html` | React 18 + CodeMirror 5 page (from CDNs; no build step) |
+
+Rhino reports a function's own line (`function f() {`) first when it enters a function, so
+Step into stops there before the first statement.
+
+Compiled mode (optimization level 0–9) does not call a Debugger, so line-by-line debugging
+always runs the script interpreted, which is slower.

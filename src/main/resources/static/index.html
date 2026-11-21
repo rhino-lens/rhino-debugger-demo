@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rhino Debugger</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<style>
+  :root {
+    --bg: #1e1f22; --panel: #2b2d30; --panel-2: #26282b; --border: #3c3f41; --text: #dfe1e5;
+    --muted: #8c8f94; --accent: #3574f0; --accent-text: #ffffff; --danger: #e5484d; --ok: #4caf50;
+    --warn: #e0a800; --exec: rgba(255, 196, 0, 0.22); --frame: rgba(53, 116, 240, 0.22);
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body, #root { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { display: grid; grid-template-rows: auto 1fr 190px; height: 100%; }
+  .toolbar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .brand { font-weight: 600; margin-right: 12px; }
+  .brand span { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 5px; padding: 5px 10px; font: inherit; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  button.danger:not(:disabled) { color: var(--danger); }
+  kbd { font: 11px var(--mono); color: var(--muted); margin-left: 4px; }
+  label.check { display: flex; align-items: center; gap: 5px; color: var(--muted); margin-left: 8px; }
+  .status { margin-left: auto; padding: 3px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status.PAUSED { color: var(--warn); border-color: var(--warn); }
+  .status.RUNNING { color: var(--accent); border-color: var(--accent); }
+  .status.FINISHED { color: var(--ok); border-color: var(--ok); }
+  .status.FAILED, .status.STOPPED { color: var(--danger); border-color: var(--danger); }
+  main { display: grid; grid-template-columns: 1fr 400px; min-height: 0; }
+  .editor-pane { min-width: 0; min-height: 0; border-right: 1px solid var(--border); }
+  .editor, .editor .CodeMirror { height: 100%; }
+  .CodeMirror { font: 13.5px/1.6 var(--mono); }
+  .CodeMirror-gutter.breakpoints { width: 20px; cursor: pointer; }
+  .CodeMirror-linenumber { cursor: pointer; }
+  .bp { width: 11px; height: 11px; border-radius: 50%; background: var(--danger); margin: 5px 0 0 5px; }
+  .bp.unverified { background: transparent; border: 2px solid var(--danger); opacity: 0.6; }
+  .exec-line { background: var(--exec) !important; }
+  .frame-line { background: var(--frame) !important; }
+  .side { overflow: auto; background: var(--panel-2); }
+  .panel { border-bottom: 1px solid var(--border); }
+  .panel h2 { margin: 0; padding: 7px 12px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--panel); }
+  .panel .body { padding: 6px 0; }
+  .empty { color: var(--muted); padding: 2px 12px; }
+  .frame { padding: 3px 12px; cursor: pointer; font-family: var(--mono); display: flex; justify-content: space-between; }
+  .frame:hover { background: rgba(255,255,255,0.04); }
+  .frame.selected { background: var(--frame); }
+  .frame .where { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; }
+  td { padding: 2px 12px; vertical-align: top; }
+  td.name { color: #9cdcfe; white-space: nowrap; }
+  td.type { color: var(--muted); white-space: nowrap; font-size: 11.5px; }
+  td.value { word-break: break-word; }
+  .watch-form { display: flex; gap: 6px; padding: 4px 12px 6px; }
+  .watch-form input { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 5px; padding: 5px 8px; font: 12.5px var(--mono); min-width: 0; }
+  .watch { display: flex; gap: 8px; padding: 2px 12px; font-family: var(--mono); font-size: 12.5px; }
+  .watch .expr { color: #9cdcfe; }
+  .watch .val { flex: 1; word-break: break-word; }
+  .watch .val.err { color: var(--danger); }
+  .watch button { padding: 0 6px; border: none; background: none; color: var(--muted); }
+  .console { display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--border); }
+  .console h2 { margin: 0; padding: 6px 12px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--panel); }
+  .console .out { flex: 1; overflow: auto; padding: 6px 12px; font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; }
+  .console .result { color: var(--ok); }
+  .console .error { color: var(--danger); }
+  .hint { color: var(--muted); }
+  @media (max-width: 900px) {
+    .app { grid-template-rows: auto 1fr 160px; }
+    main { grid-template-columns: 1fr; grid-template-rows: 1fr 300px; }
+    .editor-pane { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script>
+const { useState, useEffect, useRef } = React;
+const html = htm.bind(React.createElement);
+
+async function call(method, url, body) {
+  const options = { method };
+  if (body !== undefined) {
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
+  const response = await fetch(url, options);
+  const text = await response.text();
+  return { ok: response.ok, data: text ? JSON.parse(text) : null };
+}
+
+const isActive = s => !!s && (s.status === "RUNNING" || s.status === "PAUSED");
+
+function statusText(s) {
+  if (!s) return "Ready: click the gutter to set breakpoints, then Debug";
+  switch (s.status) {
+    case "RUNNING": return "Running…";
+    case "PAUSED": return `Paused on line ${s.line} (${s.pauseReason})`;
+    case "FINISHED": return `Finished: ${s.result}`;
+    case "FAILED": return `Failed: ${s.error}`;
+    case "STOPPED": return "Stopped";
+    default: return s.status;
+  }
+}
+
+function Editor({ source, onChange, breakpoints, breakable, onToggle, execLine, frameLine, readOnly }) {
+  const host = useRef(null);
+  const cm = useRef(null);
+  const lineMarks = useRef([]);
+  const toggleRef = useRef(onToggle);
+  const changeRef = useRef(onChange);
+  toggleRef.current = onToggle;
+  changeRef.current = onChange;
+
+  useEffect(() => {
+    const editor = CodeMirror(host.current, {
+      value: source, mode: "javascript", theme: "material-darker", lineNumbers: true,
+      gutters: ["breakpoints", "CodeMirror-linenumbers"], indentUnit: 2, tabSize: 2,
+    });
+    editor.on("gutterClick", (_, line) => toggleRef.current(line + 1));
+    editor.on("change", ed => changeRef.current(ed.getValue()));
+    cm.current = editor;
+    return () => host.current && (host.current.innerHTML = "");
+  }, []);
+
+  useEffect(() => {
+    const e = cm.current;
+    if (e && e.getValue() !== source) e.setValue(source);
+  }, [source]);
+
+  useEffect(() => { cm.current && cm.current.setOption("readOnly", readOnly); }, [readOnly]);
+
+  useEffect(() => {
+    const e = cm.current;
+    if (!e) return;
+    e.clearGutter("breakpoints");
+    for (const line of breakpoints) {
+      if (line > e.lineCount()) continue;
+      const verified = breakable.length === 0 || breakable.includes(line);
+      const marker = document.createElement("div");
+      marker.className = verified ? "bp" : "bp unverified";
+      marker.title = verified ? `Breakpoint on line ${line}` : `Line ${line} has no code the script stops on`;
+      e.setGutterMarker(line - 1, "breakpoints", marker);
+    }
+  }, [breakpoints, breakable, source]);
+
+  useEffect(() => {
+    const e = cm.current;
+    if (!e) return;
+    lineMarks.current.forEach(([line, cls]) => e.removeLineClass(line, "background", cls));
+    lineMarks.current = [];
+    const mark = (line, cls) => {
+      if (line > 0 && line <= e.lineCount()) {
+        e.addLineClass(line - 1, "background", cls);
+        lineMarks.current.push([line - 1, cls]);
+      }
+    };
+    if (frameLine && frameLine !== execLine) mark(frameLine, "frame-line");
+    if (execLine) mark(execLine, "exec-line");
+    const focus = frameLine || execLine;
+    if (focus) e.scrollIntoView({ line: focus - 1, ch: 0 }, 80);
+  }, [execLine, frameLine]);
+
+  return html`<div class="editor" ref=${host}></div>`;
+}
+
+function Panel({ title, children }) {
+  return html`<section class="panel"><h2>${title}</h2><div class="body">${children}</div></section>`;
+}
+
+function App() {
+  const [source, setSource] = useState("");
+  const [objects, setObjects] = useState([]);
+  const [breakpoints, setBreakpoints] = useState([]);
+  const [pauseOnStart, setPauseOnStart] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [state, setState] = useState(null);
+  const [frame, setFrame] = useState(0);
+  const [watches, setWatches] = useState([]);
+  const [watchInput, setWatchInput] = useState("");
+
+  const events = useRef(null);
+  const ref = useRef({});
+  ref.current = { sessionId, state, breakpoints, watches, frame, start };
+
+  useEffect(() => {
+    call("GET", "/api/sample").then(r => {
+      setSource(r.data.source);
+      setObjects(r.data.objects);
+      setBreakpoints([13]);
+      // ?autorun starts a session right away (handy for demos)
+      if (new URLSearchParams(location.search).has("autorun")) start(r.data.source, [13]);
+    });
+  }, []);
+
+  async function start(src = source, bps = breakpoints) {
+    if (events.current) events.current.close();
+    setState(null);
+    setFrame(0);
+    const r = await call("POST", "/api/sessions", { source: src, breakpoints: bps, pauseOnStart });
+    const id = r.data.id;
+    setSessionId(id);
+    const stream = new EventSource(`/api/sessions/${id}/events`);
+    stream.onmessage = event => {
+      const s = JSON.parse(event.data);
+      setState(s);
+      if (!isActive(s)) stream.close();
+    };
+    events.current = stream;
+  }
+
+  function command(action) {
+    const id = ref.current.sessionId;
+    if (id) call("POST", `/api/sessions/${id}/commands/${action}`);
+  }
+
+  function toggleBreakpoint(line) {
+    const current = ref.current.breakpoints;
+    const next = current.includes(line) ? current.filter(l => l !== line) : [...current, line].sort((a, b) => a - b);
+    setBreakpoints(next);
+    if (ref.current.sessionId && isActive(ref.current.state)) {
+      call("PUT", `/api/sessions/${ref.current.sessionId}/breakpoints`, next);
+    }
+  }
+
+  async function evaluateAll(list, frameIndex) {
+    const id = ref.current.sessionId;
+    const results = [];
+    for (const w of list) {
+      const r = await call("POST", `/api/sessions/${id}/evaluate`, { expression: w.expr, frame: frameIndex });
+      results.push({ expr: w.expr, value: r.data ? r.data.value : "error: request failed" });
+    }
+    setWatches(results);
+  }
+
+  const paused = state && state.status === "PAUSED";
+  const pauseCount = state ? state.pauseCount : 0;
+
+  useEffect(() => { setFrame(0); }, [pauseCount]);
+
+  useEffect(() => {
+    if (paused && ref.current.watches.length) evaluateAll(ref.current.watches, frame);
+  }, [pauseCount, paused, frame]);
+
+  useEffect(() => {
+    const onKey = e => {
+      const s = ref.current.state;
+      const isPaused = s && s.status === "PAUSED";
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); if (!isActive(s)) ref.current.start(); }
+      else if (e.key === "F8" && isPaused) { e.preventDefault(); command("continue"); }
+      else if (e.key === "F10" && isPaused) { e.preventDefault(); command("step-over"); }
+      else if (e.key === "F11" && isPaused) { e.preventDefault(); command(e.shiftKey ? "step-out" : "step-into"); }
+      else if (e.key === "F5" && e.shiftKey && isActive(s)) { e.preventDefault(); command("stop"); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  function addWatch(e) {
+    e.preventDefault();
+    const expr = watchInput.trim();
+    if (!expr) return;
+    const list = [...watches, { expr, value: paused ? "…" : "(evaluated when paused)" }];
+    setWatches(list);
+    setWatchInput("");
+    if (paused) evaluateAll(list, frame);
+  }
+
+  function removeWatch(index) {
+    setWatches(watches.filter((_, i) => i !== index));
+  }
+
+  const stack = state && state.stack ? state.stack : [];
+  const selected = stack[frame];
+  const active = isActive(state);
+
+  return html`
+    <div class="app">
+      <header class="toolbar">
+        <div class="brand">Rhino Debugger<span>batik-js-lens 1.7 · Rhino 1.6R5</span></div>
+        <button class="primary" onClick=${() => start()} disabled=${active} title="Ctrl/⌘ + Enter">▶ Debug</button>
+        <button onClick=${() => command("continue")} disabled=${!paused}>Continue<kbd>F8</kbd></button>
+        <button onClick=${() => command("step-over")} disabled=${!paused}>Step over<kbd>F10</kbd></button>
+        <button onClick=${() => command("step-into")} disabled=${!paused}>Step into<kbd>F11</kbd></button>
+        <button onClick=${() => command("step-out")} disabled=${!paused}>Step out<kbd>⇧F11</kbd></button>
+        <button class="danger" onClick=${() => command("stop")} disabled=${!active}>■ Stop<kbd>⇧F5</kbd></button>
+        <label class="check"><input type="checkbox" checked=${pauseOnStart}
+          onChange=${e => setPauseOnStart(e.target.checked)} />Pause at first line</label>
+        <span class=${"status " + (state ? state.status : "")} title=${statusText(state)}>${statusText(state)}</span>
+      </header>
+      <main>
+        <section class="editor-pane">
+          <${Editor} source=${source} onChange=${setSource} breakpoints=${breakpoints}
+            breakable=${state ? state.breakableLines : []} onToggle=${toggleBreakpoint}
+            execLine=${paused ? state.line : 0} frameLine=${paused && selected ? selected.line : 0}
+            readOnly=${active} />
+        </section>
+        <aside class="side">
+          <${Panel} title="Call stack">
+            ${stack.length === 0
+              ? html`<div class="empty">${paused ? "" : "Not paused"}</div>`
+              : stack.map((f, i) => html`
+                  <div key=${i} class=${"frame" + (i === frame ? " selected" : "")} onClick=${() => setFrame(i)}>
+                    <span>${f.name}</span><span class="where">line ${f.line}</span>
+                  </div>`)}
+          <//>
+          <${Panel} title=${selected ? `Variables · ${selected.name}` : "Variables"}>
+            ${!selected || selected.variables.length === 0
+              ? html`<div class="empty">${selected ? "No variables" : "Not paused"}</div>`
+              : html`<table><tbody>${selected.variables.map(v => html`
+                  <tr key=${v.name}><td class="name">${v.name}</td><td class="type">${v.type}</td>
+                  <td class="value">${v.value}</td></tr>`)}</tbody></table>`}
+          <//>
+          <${Panel} title="Watch">
+            <form class="watch-form" onSubmit=${addWatch}>
+              <input value=${watchInput} onInput=${e => setWatchInput(e.target.value)}
+                placeholder="expression, e.g. total * 2" />
+              <button type="submit">Add</button>
+            </form>
+            ${watches.map((w, i) => html`
+              <div class="watch" key=${i}>
+                <span class="expr">${w.expr}</span>
+                <span class=${"val" + (String(w.value).startsWith("error:") ? " err" : "")}>${w.value}</span>
+                <button title="Remove" onClick=${() => removeWatch(i)}>×</button>
+              </div>`)}
+          <//>
+          <${Panel} title="Java objects in scope">
+            <table><tbody>${objects.map(o => html`
+              <tr key=${o.name}><td class="name">${o.name}</td><td class="type">${o.type}</td>
+              <td class="value">${o.value}</td></tr>`)}</tbody></table>
+          <//>
+        </aside>
+      </main>
+      <section class="console">
+        <h2>Console</h2>
+        <div class="out">
+          ${!state ? html`<span class="hint">print(…) and console.log(…) output appears here.</span>` : null}
+          ${state ? state.console.map((line, i) => html`<div key=${i}>${line}</div>`) : null}
+          ${state && state.status === "FINISHED" ? html`<div class="result">⇒ ${state.result}</div>` : null}
+          ${state && state.status === "FAILED" ? html`<div class="error">✖ ${state.error}</div>` : null}
+          ${state && state.status === "STOPPED" ? html`<div class="error">■ stopped</div>` : null}
+        </div>
+      </section>
+    </div>`;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
+</script>
+</body>
+</html>
