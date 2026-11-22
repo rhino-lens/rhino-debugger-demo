@@ -14,7 +14,7 @@ import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.Undefined;
 import org.mozilla.javascript.debug.Debugger;
 
-import io.github.rhinolens.lens.Lens;
+import org.mozilla.javascript.lens.Lens;
 
 /**
  * Runs one script on the current thread the usual Rhino way: enter a Context, build a scope,

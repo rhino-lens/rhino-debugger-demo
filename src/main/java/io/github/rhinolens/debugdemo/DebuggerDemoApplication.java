@@ -1,7 +1,7 @@
 package io.github.rhinolens.debugdemo;
 
 import org.springframework.boot.SpringApplication;
-import io.github.rhinolens.lens.Lens;
+import org.mozilla.javascript.lens.Lens;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
