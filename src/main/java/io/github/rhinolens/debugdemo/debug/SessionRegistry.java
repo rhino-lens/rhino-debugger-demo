@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 
 import io.github.rhinolens.debugdemo.sample.Order;
 import io.github.rhinolens.debugdemo.sample.OrderRepository;
-import org.mozilla.javascript.lens.Lens;
+import io.github.rhinolens.lens.Lens;
 import io.github.rhinolens.debugdemo.sample.PricingService;
 import jakarta.annotation.PreDestroy;
 

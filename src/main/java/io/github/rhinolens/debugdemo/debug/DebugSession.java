@@ -23,15 +23,15 @@ import org.mozilla.javascript.debug.DebugFrame;
 import org.mozilla.javascript.debug.DebuggableScript;
 import org.mozilla.javascript.debug.Debugger;
 
-import org.mozilla.javascript.lens.ArrayElementChange;
-import org.mozilla.javascript.lens.ChangeEvent;
-import org.mozilla.javascript.lens.CollectionChange;
-import org.mozilla.javascript.lens.Lens;
-import org.mozilla.javascript.lens.LensExecution;
-import org.mozilla.javascript.lens.LensReport;
-import org.mozilla.javascript.lens.Mark;
-import org.mozilla.javascript.lens.PropertyChange;
-import org.mozilla.javascript.lens.ServiceCall;
+import io.github.rhinolens.lens.ArrayElementChange;
+import io.github.rhinolens.lens.ChangeEvent;
+import io.github.rhinolens.lens.CollectionChange;
+import io.github.rhinolens.lens.Lens;
+import io.github.rhinolens.lens.LensExecution;
+import io.github.rhinolens.lens.LensReport;
+import io.github.rhinolens.lens.Mark;
+import io.github.rhinolens.lens.PropertyChange;
+import io.github.rhinolens.lens.ServiceCall;
 
 /**
  * One script run under a line-by-line debugger, built on Rhino's Debugger / DebugFrame API.
@@ -389,7 +389,7 @@ public final class DebugSession implements Debugger {
         return out;
     }
 
-    private static String args(List<org.mozilla.javascript.lens.ValueSnapshot> args) {
+    private static String args(List<io.github.rhinolens.lens.ValueSnapshot> args) {
         List<String> texts = new ArrayList<>();
         args.forEach(a -> texts.add(a.text()));
         return "(" + String.join(", ", texts) + ")";
