@@ -18,15 +18,7 @@ evaluated unobserved, so inspecting never shows up as a change.
 
 The demo depends on `io.github.rhino-lens:batik-js-lens-base:1.7` (a byte-identical rebuild of
 `org.apache.xmlgraphics:batik-js:1.7`) and `io.github.rhino-lens:batik-js-lens:0.1.0` (observability).
-Until they are on Maven Central, install local builds first: run `mvn install` in
-[batik-js-lens](https://github.com/rhino-lens/batik-js-lens), and for the base jar (from
-[batik-js-lens-base](https://github.com/rhino-lens/batik-js-lens-base)):
-
-```sh
-mvn install:install-file -Dfile=batik-js-lens-base-1.7.jar -DpomFile=pom.xml   # from a batik-js-lens-base build
-```
-
-Then:
+Both are on Maven Central, so Maven downloads them. Then:
 
 ```sh
 mvn package
