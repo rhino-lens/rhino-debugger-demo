@@ -18,7 +18,7 @@ public record SessionState(
         List<ChangeView> changes,
         String lensSummary) {
 
-    /** One thing batik-js-lens recorded: a property change, collection change, service call or mark. */
+    /** One thing rhino-lens recorded: a property change, collection change, service call or mark. */
     public record ChangeView(int line, String kind, String target, String detail) {
     }
 

@@ -1,6 +1,6 @@
 # rhino-debugger-demo
 
-A small browser IDE that debugs JavaScript line by line on **batik-js-lens-base 1.7** (Rhino 1.6R5),
+A small browser IDE that debugs JavaScript line by line on **batik-js 1.7** (Rhino 1.6R5),
 built on Rhino's own `Debugger` / `DebugFrame` API. Spring Boot 4.0.8 (Spring Framework 7.0.9), Java 21.
 
 Features: breakpoints (click the gutter), Continue (F8), Step over (F10), Step into (F11),
@@ -8,7 +8,7 @@ Step out (Shift+F11), Stop (Shift+F5), call stack with frame selection, variable
 watch expressions evaluated in the selected frame, and `print` / `console.log` output.
 Scripts get Java objects in scope (`order`, `pricing`, `orderRepository`) to show Java interop.
 
-**Changes panel ([batik-js-lens](https://github.com/rhino-lens/batik-js-lens)).** Each debug session is one
+**Changes panel ([rhino-lens](https://github.com/rhino-lens/rhino-lens)).** Each debug session is one
 Lens execution, so as you step, the panel lists what the rule did to Java objects: setter calls and
 `=` assignments with old → new values, collection changes, and service calls with arguments, results
 and timings, each on its exact line. Click a change to highlight its line. Watch expressions are
@@ -16,8 +16,8 @@ evaluated unobserved, so inspecting never shows up as a change.
 
 ## Run
 
-The demo depends on `io.github.rhino-lens:batik-js-lens-base:1.7` (a byte-identical rebuild of
-`org.apache.xmlgraphics:batik-js:1.7`) and `io.github.rhino-lens:batik-js-lens:0.1.0` (observability).
+The demo depends on `io.github.rhino-lens:batik-js:1.7` (a byte-identical rebuild of
+`org.apache.xmlgraphics:batik-js:1.7`) and `io.github.rhino-lens:rhino-lens:0.2.0` (observability).
 Both are on Maven Central, so Maven downloads them. Then:
 
 ```sh

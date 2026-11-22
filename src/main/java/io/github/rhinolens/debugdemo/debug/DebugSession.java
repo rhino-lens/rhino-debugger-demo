@@ -23,15 +23,15 @@ import org.mozilla.javascript.debug.DebugFrame;
 import org.mozilla.javascript.debug.DebuggableScript;
 import org.mozilla.javascript.debug.Debugger;
 
-import io.github.rhinolens.lens.ArrayElementChange;
-import io.github.rhinolens.lens.ChangeEvent;
-import io.github.rhinolens.lens.CollectionChange;
-import io.github.rhinolens.lens.Lens;
-import io.github.rhinolens.lens.LensExecution;
-import io.github.rhinolens.lens.LensReport;
-import io.github.rhinolens.lens.Mark;
-import io.github.rhinolens.lens.PropertyChange;
-import io.github.rhinolens.lens.ServiceCall;
+import io.github.rhinolens.ArrayElementChange;
+import io.github.rhinolens.ChangeEvent;
+import io.github.rhinolens.CollectionChange;
+import io.github.rhinolens.Lens;
+import io.github.rhinolens.LensExecution;
+import io.github.rhinolens.LensReport;
+import io.github.rhinolens.Mark;
+import io.github.rhinolens.PropertyChange;
+import io.github.rhinolens.ServiceCall;
 
 /**
  * One script run under a line-by-line debugger, built on Rhino's Debugger / DebugFrame API.
@@ -84,7 +84,7 @@ public final class DebugSession implements Debugger {
     private volatile String result;
     private volatile String error;
     private volatile SessionState state;
-    private volatile LensExecution lens;          // batik-js-lens execution for this run
+    private volatile LensExecution lens;          // rhino-lens execution for this run
     private volatile LensReport lensReport;       // its final report
     private volatile int pauseCount;
 
@@ -357,7 +357,7 @@ public final class DebugSession implements Debugger {
                 sorted(breakpoints), s.console(), s.result(), s.error(), s.changes(), s.lensSummary());
     }
 
-    // ---- batik-js-lens ----
+    // ---- rhino-lens ----
 
     private LensReport currentLensReport() {
         if (lensReport != null) return lensReport;
@@ -389,7 +389,7 @@ public final class DebugSession implements Debugger {
         return out;
     }
 
-    private static String args(List<io.github.rhinolens.lens.ValueSnapshot> args) {
+    private static String args(List<io.github.rhinolens.ValueSnapshot> args) {
         List<String> texts = new ArrayList<>();
         args.forEach(a -> texts.add(a.text()));
         return "(" + String.join(", ", texts) + ")";

@@ -16,7 +16,7 @@ import org.springframework.core.io.ClassPathResource;
 
 import io.github.rhinolens.debugdemo.debug.DebugSession.Action;
 import io.github.rhinolens.debugdemo.debug.DebugSession.Status;
-import io.github.rhinolens.lens.Lens;
+import io.github.rhinolens.Lens;
 
 class DebugSessionTest {
 

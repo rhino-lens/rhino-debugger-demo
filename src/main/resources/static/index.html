@@ -308,7 +308,7 @@ function App() {
   return html`
     <div class="app">
       <header class="toolbar">
-        <div class="brand">Rhino Debugger<span>batik-js-lens-base 1.7 · Rhino 1.6R5 · Lens 0.1.0</span></div>
+        <div class="brand">Rhino Debugger<span>batik-js 1.7 · Rhino 1.6R5 · Lens 0.1.0</span></div>
         <button class="primary" onClick=${() => start()} disabled=${active} title="Ctrl/⌘ + Enter">▶ Debug</button>
         <button onClick=${() => command("continue")} disabled=${!paused}>Continue<kbd>F8</kbd></button>
         <button onClick=${() => command("step-over")} disabled=${!paused}>Step over<kbd>F10</kbd></button>
@@ -375,7 +375,7 @@ function App() {
         </div>
         </div>
         <div class="changes">
-          <h2>Changes<span>recorded by batik-js-lens</span></h2>
+          <h2>Changes<span>recorded by rhino-lens</span></h2>
           <div class="summary">${state && state.lensSummary ? state.lensSummary
             : "Property changes, collection changes and service calls appear here as the rule runs."}</div>
           <div class="list">
