@@ -16,7 +16,7 @@
   * { box-sizing: border-box; }
   html, body, #root { height: 100%; margin: 0; }
   body { background: var(--bg); color: var(--text); font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  .app { display: grid; grid-template-rows: auto 1fr 190px; height: 100%; }
+  .app { display: grid; grid-template-rows: auto 1fr 240px; height: 100%; }
   .toolbar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
   .brand { font-weight: 600; margin-right: 12px; }
   .brand span { color: var(--muted); font-weight: 400; margin-left: 6px; }
@@ -63,8 +63,25 @@
   .watch .val { flex: 1; word-break: break-word; }
   .watch .val.err { color: var(--danger); }
   .watch button { padding: 0 6px; border: none; background: none; color: var(--muted); }
-  .console { display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--border); }
-  .console h2 { margin: 0; padding: 6px 12px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--panel); }
+  .bottom { display: grid; grid-template-columns: 1fr 1.3fr; min-height: 0; border-top: 1px solid var(--border); }
+  .console { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
+  .changes { display: flex; flex-direction: column; min-height: 0; }
+  .changes h2, .console h2 { display: flex; justify-content: space-between; align-items: baseline; }
+  .changes h2 span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .changes .summary { padding: 4px 12px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--border); }
+  .changes .list { flex: 1; overflow: auto; padding: 4px 0; font-family: var(--mono); font-size: 12.5px; }
+  .change { display: grid; grid-template-columns: 42px 92px 1fr; gap: 8px; padding: 2px 12px; cursor: pointer; align-items: baseline; }
+  .change:hover { background: rgba(255,255,255,0.04); }
+  .change .ln { color: var(--muted); text-align: right; }
+  .change .kind { font-size: 10.5px; letter-spacing: 0.04em; padding: 0 6px; border-radius: 4px; border: 1px solid var(--border); text-align: center; }
+  .change .kind.SETTER, .change .kind.ASSIGNMENT, .change .kind.FIELD, .change .kind.ARRAY { color: #9cdcfe; border-color: #2f5a78; }
+  .change .kind.COLLECTION { color: #c586c0; border-color: #5e3d5c; }
+  .change .kind.SERVICE { color: var(--warn); border-color: #6b5410; }
+  .change .kind.MARK { color: var(--ok); border-color: #2e5f31; }
+  .change .what { word-break: break-word; }
+  .change .detail { color: var(--muted); }
+  .focus-line { background: rgba(197, 134, 192, 0.22) !important; }
+  .console h2, .changes h2 { margin: 0; padding: 6px 12px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--panel); }
   .console .out { flex: 1; overflow: auto; padding: 6px 12px; font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; }
   .console .result { color: var(--ok); }
   .console .error { color: var(--danger); }
@@ -72,6 +89,8 @@
   @media (max-width: 900px) {
     .app { grid-template-rows: auto 1fr 160px; }
     main { grid-template-columns: 1fr; grid-template-rows: 1fr 300px; }
+    .bottom { grid-template-columns: 1fr; }
+    .console { border-right: none; border-bottom: 1px solid var(--border); }
     .editor-pane { border-right: none; border-bottom: 1px solid var(--border); }
   }
 </style>
@@ -112,7 +131,7 @@ function statusText(s) {
   }
 }
 
-function Editor({ source, onChange, breakpoints, breakable, onToggle, execLine, frameLine, readOnly }) {
+function Editor({ source, onChange, breakpoints, breakable, onToggle, execLine, frameLine, focusLine, readOnly }) {
   const host = useRef(null);
   const cm = useRef(null);
   const lineMarks = useRef([]);
@@ -166,9 +185,10 @@ function Editor({ source, onChange, breakpoints, breakable, onToggle, execLine, 
     };
     if (frameLine && frameLine !== execLine) mark(frameLine, "frame-line");
     if (execLine) mark(execLine, "exec-line");
-    const focus = frameLine || execLine;
+    if (focusLine && focusLine !== execLine) mark(focusLine, "focus-line");
+    const focus = focusLine || frameLine || execLine;
     if (focus) e.scrollIntoView({ line: focus - 1, ch: 0 }, 80);
-  }, [execLine, frameLine]);
+  }, [execLine, frameLine, focusLine]);
 
   return html`<div class="editor" ref=${host}></div>`;
 }
@@ -187,6 +207,7 @@ function App() {
   const [frame, setFrame] = useState(0);
   const [watches, setWatches] = useState([]);
   const [watchInput, setWatchInput] = useState("");
+  const [focusLine, setFocusLine] = useState(0);
 
   const events = useRef(null);
   const ref = useRef({});
@@ -206,6 +227,7 @@ function App() {
     if (events.current) events.current.close();
     setState(null);
     setFrame(0);
+    setFocusLine(0);
     const r = await call("POST", "/api/sessions", { source: src, breakpoints: bps, pauseOnStart });
     const id = r.data.id;
     setSessionId(id);
@@ -286,7 +308,7 @@ function App() {
   return html`
     <div class="app">
       <header class="toolbar">
-        <div class="brand">Rhino Debugger<span>batik-js-lens 1.7 · Rhino 1.6R5</span></div>
+        <div class="brand">Rhino Debugger<span>batik-js-lens-base 1.7 · Rhino 1.6R5 · Lens 0.1.0</span></div>
         <button class="primary" onClick=${() => start()} disabled=${active} title="Ctrl/⌘ + Enter">▶ Debug</button>
         <button onClick=${() => command("continue")} disabled=${!paused}>Continue<kbd>F8</kbd></button>
         <button onClick=${() => command("step-over")} disabled=${!paused}>Step over<kbd>F10</kbd></button>
@@ -302,6 +324,7 @@ function App() {
           <${Editor} source=${source} onChange=${setSource} breakpoints=${breakpoints}
             breakable=${state ? state.breakableLines : []} onToggle=${toggleBreakpoint}
             execLine=${paused ? state.line : 0} frameLine=${paused && selected ? selected.line : 0}
+            focusLine=${focusLine}
             readOnly=${active} />
         </section>
         <aside class="side">
@@ -340,7 +363,8 @@ function App() {
           <//>
         </aside>
       </main>
-      <section class="console">
+      <section class="bottom">
+        <div class="console">
         <h2>Console</h2>
         <div class="out">
           ${!state ? html`<span class="hint">print(…) and console.log(…) output appears here.</span>` : null}
@@ -348,6 +372,20 @@ function App() {
           ${state && state.status === "FINISHED" ? html`<div class="result">⇒ ${state.result}</div>` : null}
           ${state && state.status === "FAILED" ? html`<div class="error">✖ ${state.error}</div>` : null}
           ${state && state.status === "STOPPED" ? html`<div class="error">■ stopped</div>` : null}
+        </div>
+        </div>
+        <div class="changes">
+          <h2>Changes<span>recorded by batik-js-lens</span></h2>
+          <div class="summary">${state && state.lensSummary ? state.lensSummary
+            : "Property changes, collection changes and service calls appear here as the rule runs."}</div>
+          <div class="list">
+            ${state && state.changes ? state.changes.map((c, i) => html`
+              <div class="change" key=${i} title=${"Show line " + c.line} onClick=${() => setFocusLine(c.line)}>
+                <span class="ln">L${c.line}</span>
+                <span class=${"kind " + c.kind}>${c.kind}</span>
+                <span class="what">${c.target} <span class="detail">${c.detail}</span></span>
+              </div>`) : null}
+          </div>
         </div>
       </section>
     </div>`;

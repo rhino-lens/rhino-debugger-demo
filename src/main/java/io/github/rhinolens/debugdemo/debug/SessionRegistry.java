@@ -12,6 +12,8 @@ import java.util.concurrent.Executors;
 import org.springframework.stereotype.Service;
 
 import io.github.rhinolens.debugdemo.sample.Order;
+import io.github.rhinolens.debugdemo.sample.OrderRepository;
+import io.github.rhinolens.lens.Lens;
 import io.github.rhinolens.debugdemo.sample.PricingService;
 import jakarta.annotation.PreDestroy;
 
@@ -45,8 +47,15 @@ public class SessionRegistry {
     /** The Java objects scripts see, made fresh for each run. */
     public static Map<String, Object> javaObjects() {
         Map<String, Object> objects = new LinkedHashMap<>();
-        objects.put("order", Order.sample());
-        objects.put("pricing", new PricingService());
+        Order order = Order.sample();
+        Lens.label(order, "order"); // change paths start at "order"
+        objects.put("order", order);
+        PricingService pricing = new PricingService();
+        OrderRepository orderRepository = new OrderRepository();
+        Lens.registerService(pricing, "pricing");                 // service names as scripts see them
+        Lens.registerService(orderRepository, "orderRepository");
+        objects.put("pricing", pricing);
+        objects.put("orderRepository", orderRepository);
         return objects;
     }
 

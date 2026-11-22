@@ -10,11 +10,13 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 
 import io.github.rhinolens.debugdemo.debug.DebugSession.Action;
 import io.github.rhinolens.debugdemo.debug.DebugSession.Status;
+import io.github.rhinolens.lens.Lens;
 
 class DebugSessionTest {
 
@@ -26,6 +28,30 @@ class DebugSessionTest {
     private static final int ADD_LINE = 15;
 
     private final BlockingQueue<SessionState> states = new LinkedBlockingQueue<>();
+
+    @BeforeAll
+    static void installLens() {
+        Lens.install();
+    }
+
+    @Test
+    void lensRecordsWhatTheRuleChanged() throws Exception {
+        start(sample(), List.of(), false);
+        SessionState s = await(st -> st.status() == Status.FINISHED);
+
+        assertThat(s.result()).isEqualTo("35.09");
+        assertThat(s.changes()).extracting(SessionState.ChangeView::kind, SessionState.ChangeView::target, SessionState.ChangeView::line)
+                .contains(
+                        org.assertj.core.groups.Tuple.tuple("SERVICE", "pricing.discountFor(\"GOLD\", 38.99)", 18),
+                        org.assertj.core.groups.Tuple.tuple("SETTER", "order.finalTotal", 20),
+                        org.assertj.core.groups.Tuple.tuple("ASSIGNMENT", "order.status", 22),
+                        org.assertj.core.groups.Tuple.tuple("COLLECTION", "order.getNotes().add(\"priced by rule.js\")", 23),
+                        org.assertj.core.groups.Tuple.tuple("SERVICE", "orderRepository.save(Order(id=1001))", 24),
+                        org.assertj.core.groups.Tuple.tuple("MARK", "pricing done", 25));
+        SessionState.ChangeView total = s.changes().stream().filter(c -> c.kind().equals("SETTER")).findFirst().orElseThrow();
+        assertThat(total.detail()).isEqualTo("0.0 \u2192 35.09");
+        assertThat(s.lensSummary()).startsWith("3 changes").contains("SUCCESS");
+    }
 
     @Test
     void breakpointsStepsEvaluateAndFinish() throws Exception {

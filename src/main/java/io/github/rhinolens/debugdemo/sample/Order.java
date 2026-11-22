@@ -9,6 +9,8 @@ public class Order {
     private final String customerTier;
     private final List<LineItem> items = new ArrayList<>();
     private double finalTotal;
+    private String status = "NEW";
+    private final List<String> notes = new ArrayList<>();
 
     public Order(String customerTier) {
         this.customerTier = customerTier;
@@ -35,6 +37,23 @@ public class Order {
         this.finalTotal = finalTotal;
     }
 
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public List<String> getNotes() {
+        return notes;
+    }
+
+    /** Lets Lens show the order as Order(id=…) and match it to a stored record. */
+    public long getId() {
+        return 1001;
+    }
+
     /** A fresh order for each debug session, since scripts change it. */
     public static Order sample() {
         return new Order("GOLD")
@@ -45,6 +64,6 @@ public class Order {
 
     @Override
     public String toString() {
-        return "Order{tier=" + customerTier + ", items=" + items.size() + ", finalTotal=" + finalTotal + "}";
+        return "Order{tier=" + customerTier + ", status=" + status + ", items=" + items.size() + ", finalTotal=" + finalTotal + "}";
     }
 }

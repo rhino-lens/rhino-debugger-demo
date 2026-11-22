@@ -23,6 +23,16 @@ import org.mozilla.javascript.debug.DebugFrame;
 import org.mozilla.javascript.debug.DebuggableScript;
 import org.mozilla.javascript.debug.Debugger;
 
+import io.github.rhinolens.lens.ArrayElementChange;
+import io.github.rhinolens.lens.ChangeEvent;
+import io.github.rhinolens.lens.CollectionChange;
+import io.github.rhinolens.lens.Lens;
+import io.github.rhinolens.lens.LensExecution;
+import io.github.rhinolens.lens.LensReport;
+import io.github.rhinolens.lens.Mark;
+import io.github.rhinolens.lens.PropertyChange;
+import io.github.rhinolens.lens.ServiceCall;
+
 /**
  * One script run under a line-by-line debugger, built on Rhino's Debugger / DebugFrame API.
  *
@@ -74,6 +84,8 @@ public final class DebugSession implements Debugger {
     private volatile String result;
     private volatile String error;
     private volatile SessionState state;
+    private volatile LensExecution lens;          // batik-js-lens execution for this run
+    private volatile LensReport lensReport;       // its final report
     private volatile int pauseCount;
 
     // Used only on the script thread.
@@ -98,18 +110,25 @@ public final class DebugSession implements Debugger {
 
     /** Runs the script on the calling thread until it finishes, fails or is stopped. */
     public void run() {
+        LensExecution execution = Lens.execution(sourceName, Map.of("session", id));
+        lens = execution;
         try {
             result = ScriptRunner.run(source, sourceName, javaObjects, this, console::add);
             status = Status.FINISHED;
+            execution.succeeded();
         } catch (StopSignal stop) {
             status = Status.STOPPED;
+            execution.stopped();
         } catch (RhinoException e) {
             error = e.details() + " (line " + e.lineNumber() + ")";
             status = Status.FAILED;
+            execution.failed(e);
         } catch (Throwable t) {
             error = String.valueOf(t);
             status = Status.FAILED;
+            execution.failed(t);
         } finally {
+            lensReport = execution.finish(); // never throws
             stack.clear();
             pauseReason = null;
             Request leftover;
@@ -287,7 +306,9 @@ public final class DebugSession implements Debugger {
         if (index < 0 || index >= stack.size()) return "error: no such frame";
         inspecting = true;
         try {
-            Object value = cx.evaluateString(stack.get(index).activation, ev.expression(), "<watch>", 1, null);
+            // watches are inspection, not changes the rule made: not observed by Lens
+            Object value = Lens.unobserved(
+                    () -> cx.evaluateString(stack.get(index).activation, ev.expression(), "<watch>", 1, null));
             return Values.describe(value);
         } catch (RhinoException e) {
             return "error: " + e.details();
@@ -323,8 +344,9 @@ public final class DebugSession implements Debugger {
                 }
             }
             int line = frames.isEmpty() ? 0 : frames.get(0).line();
+            LensReport report = currentLensReport();
             return new SessionState(id, status, pauseCount, pauseReason, line, frames, sorted(breakableLines),
-                    sorted(breakpoints), List.copyOf(console), result, error);
+                    sorted(breakpoints), List.copyOf(console), result, error, changes(report), summary(report));
         } finally {
             inspecting = wasInspecting;
         }
@@ -332,7 +354,53 @@ public final class DebugSession implements Debugger {
 
     private SessionState withBreakpoints(SessionState s) {
         return new SessionState(s.id(), s.status(), s.pauseCount(), s.pauseReason(), s.line(), s.stack(), s.breakableLines(),
-                sorted(breakpoints), s.console(), s.result(), s.error());
+                sorted(breakpoints), s.console(), s.result(), s.error(), s.changes(), s.lensSummary());
+    }
+
+    // ---- batik-js-lens ----
+
+    private LensReport currentLensReport() {
+        if (lensReport != null) return lensReport;
+        LensExecution x = lens;
+        return x == null ? null : x.report();
+    }
+
+    private static List<SessionState.ChangeView> changes(LensReport report) {
+        List<SessionState.ChangeView> out = new ArrayList<>();
+        if (report == null) return out;
+        for (ChangeEvent e : report.events()) {
+            if (e instanceof PropertyChange c) {
+                out.add(new SessionState.ChangeView(c.line(), c.via().name(), c.target() + "." + c.property(),
+                        c.oldValue().text() + " \u2192 " + c.newValue().text()));
+            } else if (e instanceof CollectionChange c) {
+                out.add(new SessionState.ChangeView(c.line(), "COLLECTION", c.target() + "." + c.method() + args(c.args()),
+                        "size " + c.sizeBefore() + " \u2192 " + c.sizeAfter()));
+            } else if (e instanceof ArrayElementChange c) {
+                out.add(new SessionState.ChangeView(c.line(), "ARRAY", c.target() + "[" + c.index() + "]",
+                        c.oldValue().text() + " \u2192 " + c.newValue().text()));
+            } else if (e instanceof ServiceCall c) {
+                out.add(new SessionState.ChangeView(c.line(), "SERVICE", c.service() + "." + c.method() + args(c.args()),
+                        (c.error() != null ? "threw " + c.error() : "\u2192 " + c.result().text())
+                                + String.format(" (%.2f ms)", c.durationNanos() / 1e6)));
+            } else if (e instanceof Mark m) {
+                out.add(new SessionState.ChangeView(m.line(), "MARK", m.label(), ""));
+            }
+        }
+        return out;
+    }
+
+    private static String args(List<io.github.rhinolens.lens.ValueSnapshot> args) {
+        List<String> texts = new ArrayList<>();
+        args.forEach(a -> texts.add(a.text()));
+        return "(" + String.join(", ", texts) + ")";
+    }
+
+    private static String summary(LensReport r) {
+        if (r == null) return null;
+        return String.format("%d change%s \u00b7 %d service call%s \u00b7 %s in %.1f ms \u00b7 Lens overhead %.2f ms",
+                r.changeCount(), r.changeCount() == 1 ? "" : "s",
+                r.stats().count(ChangeEvent.Kind.SERVICE_CALL), r.stats().count(ChangeEvent.Kind.SERVICE_CALL) == 1 ? "" : "s",
+                r.outcome(), r.durationMillis(), r.stats().overheadNanos() / 1e6);
     }
 
     private static List<SessionState.Variable> variables(Frame frame, boolean global) {

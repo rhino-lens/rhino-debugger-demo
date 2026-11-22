@@ -14,6 +14,8 @@ import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.Undefined;
 import org.mozilla.javascript.debug.Debugger;
 
+import io.github.rhinolens.lens.Lens;
+
 /**
  * Runs one script on the current thread the usual Rhino way: enter a Context, build a scope,
  * put Java objects into it, evaluate. For debugging it runs in interpreted mode
@@ -22,7 +24,7 @@ import org.mozilla.javascript.debug.Debugger;
 final class ScriptRunner {
 
     /** Names this runner adds to the scope; the variables view hides them. */
-    static final Set<String> BUILT_INS = Set.of("print", "console");
+    static final Set<String> BUILT_INS = Set.of("print", "console", "lens");
 
     /** Classes scripts may not reach through Packages / java.* (this server runs posted scripts). */
     private static final List<String> DENIED = List.of(
@@ -57,6 +59,7 @@ final class ScriptRunner {
             Scriptable consoleObject = cx.newObject(scope);
             ScriptableObject.putProperty(consoleObject, "log", print);
             ScriptableObject.putProperty(scope, "console", consoleObject);
+            ScriptableObject.putProperty(scope, "lens", Context.javaToJS(Lens.scriptApi(), scope));
 
             Object result = cx.evaluateString(scope, source, sourceName, 1, null);
             return Values.describe(result);

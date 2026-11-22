@@ -14,7 +14,13 @@ public record SessionState(
         List<Integer> breakpoints,
         List<String> console,
         String result,
-        String error) {
+        String error,
+        List<ChangeView> changes,
+        String lensSummary) {
+
+    /** One thing batik-js-lens recorded: a property change, collection change, service call or mark. */
+    public record ChangeView(int line, String kind, String target, String detail) {
+    }
 
     /** One call-stack entry, innermost first. */
     public record StackFrameView(String name, int line, List<Variable> variables) {
